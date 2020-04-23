@@ -2,7 +2,11 @@ const express = require('express')
 const bodyParser = require('body-parser')
 const cors = require('cors');
 const app = express();
-const pool = require('./models/config');
+const userRoutes = require("./routes/user");
+const commentRoutes = require("./routes/comment");
+const articleRoutes = require("./routes/article");
+const gifRoutes = require("./routes/gifs");
+const feedRoutes = require("./routes/feed");
 
 app.use(cors());
 
@@ -13,19 +17,25 @@ app.use(bodyParser.urlencoded({
   })
 );
 
-const getUsers = (request, response) => {
-  pool.query('SELECT * FROM employees', (error, results) => {
-    if (error) {
-      console.error(error)
-    }
-    response.status(200).json(results.rows)
-  });
-}
 
 app.get('/', (request, response) => {
   response.json({ info: 'Node.js, Express, and Postgres API' })
 });
 
-app.get('/users', getUsers)
+// Account Signup, Login, Getting and Modifying users
+app.use("/api/v1/auth/", userRoutes);
+
+//  Articles
+app.use("/api/v1/articles", articleRoutes);
+
+// GIFs
+app.use("/api/v1/gifs", gifRoutes);
+
+// Comments
+app.use("/posts", commentRoutes);
+
+// Central Middleware for Article and GIFs
+app.use("/api/v1/feed", feedRoutes);
+
 
 module.exports = app;

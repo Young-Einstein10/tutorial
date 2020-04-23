@@ -236,27 +236,19 @@ Go into your 'models' folder and create a file called config.js and paste in the
 
     dotenv.config();
 
-    const connectionString = `postgresql://${process.env.
-        DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`;
+    const connectionString = `postgresql://${process.env.DB_USER}:${process.env.DB_PASSWORD}@${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`;
 
-    if (process.env.NODE_ENV === 'production') {
-        const pool = new Pool({
-            connectionString: process.env.DATABASE_URL
-        }) 
-    } else if (process.env.NODE_ENV == 'test') {
-        const pool = new Pool({
-            connectionString: process.env.TEST_DB_URL
-        }) 
-    } else {
-        const pool = new Pool({
-            connectionString: connectionString
-        }) 
-    }
+    const DB_URL = process.env.NODE_ENV === 'production' ? process.env.DATABASE_URL : process.env.NODE_ENV == 'test' ? process.env.TEST_DB_URL : connectionString;
 
+
+    const pool = new Pool({
+        connectionString: DB_URL
+    });
 
     pool.on('connect', () => {
-    console.log('connected to the Database');
+        console.log('connected to the Database');
     });
+
 
     module.exports = pool
 
@@ -297,3 +289,168 @@ Then, open your browser and type in this route `http://localhost:5000/users` in 
 
 ![Create Admin](./images/results.png)
 
+
+## Setting Up our API Routes
+
+The next thing we will be doing is setting up our routes. In our routes folder we created earlier, create the following files `user.js`, `article.js`, `feed.js`, `gifs.js`. In your terminal, type in the following: 
+
+    cd routes
+    touch user.js article.js gifs.js feed.js comment.js
+
+Using the API Endpoints specification given to us by Andela, we will be creating endpoints needed by the files created above, starting from `user.js`, paste in the following code inside the file
+
+    const express = require('express');
+    const router = express.Router();
+    
+
+    router.post('/createUser', (request, response) => {});
+    router.post('/signin', (request, response) => {});
+
+    module.exports = router;
+
+So whenever a user navigates to any of the routes listed, the callback function passed in the router function will be invoked to handle the request. Its always a good idea to separate our key features from each other in order prevent bugs and code entagling into each other. For that reason, we will be importing our business logic from our `controllers` folder. Make the following changes to `user.js` file below:
+
+    const express = require('express');
+    const router = express.Router();
+    const userCtrl = require('../controllers/user.js');
+
+
+    router.post('/createUser', userCtrl.signup);
+    router.post('/signin', userCtrl.signin);
+    router.get('/', userCtrl.getAllUsers);
+    router.get('/:id', userCtrl.getUserById);
+    router.patch('/:id', userCtrl.updateUser);
+    router.delete('/:id', userCtrl.deleteUser);
+
+
+    module.exports = router;
+
+We imported `userCtrl` from `../controllers/account.js`, don't panic😉, I know we haven't created any file in our `controllers`. We'll do that just after we finish creating our routes. Paste the following code for each of the remaining files in our `routes` folder
+
+    // article.js
+    const express = require("express");
+    const router = express.Router();
+    const articleCtrl = require("../controllers/article.js");    
+
+    router.get("/", articleCtrl.getAllArticles);
+    router.post("/", articleCtrl.postArticles);
+    router.get("/:id", articleCtrl.getArticleById);
+    router.patch("/:id", articleCtrl.updateArticle);
+    router.delete("/:id", articleCtrl.deleteArticle);
+
+
+    module.exports = router;
+
+
+    // gifs.js
+    const express = require("express");
+    const router = express.Router();
+    const gifCtrl = require("../controllers/gif.js");
+    
+
+    router.get("/", gifCtrl.getAllGifs);
+    router.post("/", gifCtrl.postGifs);
+    router.get("/:id", gifCtrl.getGifById);
+    router.delete("/:id", gifCtrl.deleteGif);
+
+
+    module.exports = router;
+
+
+    // feed.js
+    const express = require('express');
+    const router = express.Router();
+    const feedCtrl = require('../controllers/feed.js');
+
+
+    router.get('/', feedCtrl.getFeed);
+
+    module.exports = router;
+
+
+    // comment.js
+    const express = require('express');
+    const router = express.Router();
+    const commentCtrl = require('../controllers/comment.js');
+
+
+    router.post("/:id/comment", commentCtrl.postComment);
+    router.get("/:id/comment", commentCtrl.getAllComments);
+    router.delete("/:id/comment/:id", commentCtrl.deleteComment);
+
+
+    module.exports = router;
+
+One last thing we need to do to finish setting up our routes is importing the routes in our `app.js` file, without doing that, there is no way our routes going to work. 
+
+    const userRoutes = require("./routes/user");
+    const commentRoutes = require("./routes/comment");
+    const articleRoutes = require("./routes/article");
+    const gifRoutes = require("./routes/gifs");
+    const feedRoutes = require("./routes/feed");
+
+    // Account Signup, Login, Getting and Modifying users
+    app.use("/api/v1/auth/", userRoutes);
+
+    //  Articles
+    app.use("/api/v1/articles", articleRoutes);
+
+    // GIFs
+    app.use("/api/v1/gifs", gifRoutes);
+
+    // Comments
+    app.use("/posts", commentRoutes);
+
+    // Central Middleware for Article and GIFs
+    app.use("/api/v1/feed", feedRoutes);
+
+Then we delete the `getUser` controller we created earlier in testing our database connection previously, our final`app.js` is like this
+
+    const express = require('express')
+    const bodyParser = require('body-parser')
+    const cors = require('cors');
+    const app = express();
+    const userRoutes = require("./routes/user");
+    const commentRoutes = require("./routes/comment");
+    const articleRoutes = require("./routes/article");
+    const gifRoutes = require("./routes/gifs");
+    const feedRoutes = require("./routes/feed");
+
+    app.use(cors());
+
+    // Parse incoming requests data
+    app.use(bodyParser.json())
+    app.use(bodyParser.urlencoded({
+            extended: true,
+        })
+    );
+
+
+    app.get('/', (request, response) => {
+        response.json({ info: 'Node.js, Express, and Postgres API' })
+    });
+
+    // Account Signup, Login, Getting and Modifying users
+    app.use("/api/v1/auth/", userRoutes);
+
+    //  Articles
+    app.use("/api/v1/articles", articleRoutes);
+
+    // GIFs
+    app.use("/api/v1/gifs", gifRoutes);
+
+    // Comments
+    app.use("/posts", commentRoutes);
+
+    // Central Middleware for Article and GIFs
+    app.use("/api/v1/feed", feedRoutes);
+
+
+    module.exports = app;
+
+Now that we're done creating our routes, let's create the files needed in our `controllers` folder, type the following in your terminal
+
+    cd ../controllers
+    touch feed.js article.js gif.js user.js comment.js
+
+We will be creating the logic needed for each routes in these files, this is where most of the thinking and cracking of heads begins, brace up for the next section, you've done really well to get this far👍👍👍
